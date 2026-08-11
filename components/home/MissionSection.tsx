@@ -33,6 +33,8 @@ const AboutMissionSection = () => {
                 src="/images/about-seva.webp"
                 alt="Community food distribution"
                 fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
               <div
