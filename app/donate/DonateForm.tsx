@@ -67,7 +67,6 @@ const WORLD_COUNTRIES = [
 ];
 
 // ── Currency support (USD, EUR, GBP only — min set above NOWPayments' real BTC→USDT-TRC20 floor) ──
-// ── Currency support (USD, EUR, GBP only — min raised above NOWPayments' real BTC floor, was hitting AMOUNT_MINIMAL_ERROR at $15 ──
 const CURRENCY_OPTIONS = [
   { value: "usd", label: "USD ($)", symbol: "$", presets: [25, 50, 100, 250, 500], min: 25 },
   { value: "eur", label: "EUR (€)", symbol: "€", presets: [25, 50, 100, 250, 500], min: 25 },
@@ -90,10 +89,284 @@ const inputBase =
 const inputCls  = (e?: string) =>
   `${inputBase} ${e ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-[#15803d] hover:border-green-300"}`;
 const selectCls = (e?: string) =>
-  `${inputBase} cursor-pointer appearance-none ${e ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-[#15803d] hover:border-green-300"}`;
+  `${inputBase} cursor-pointer appearance-none pr-10 ${e ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-[#15803d] hover:border-green-300"}`;
 
 const ErrorMsg = ({ msg }: { msg?: string }) =>
   msg ? <p className="text-red-500 text-xs mt-1.5 font-medium">{msg}</p> : null;
+
+/* Small chevron so every <select> (native appearance removed) still visibly
+   reads as a dropdown — applies uniformly across currency / cause / state /
+   country / donor-category selects. */
+const SelectField = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`relative ${className}`}>
+    {children}
+    <svg
+      className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  </div>
+);
+
+const MONTHS_SHORT = [
+  { value: "01", label: "Jan" }, { value: "02", label: "Feb" }, { value: "03", label: "Mar" },
+  { value: "04", label: "Apr" }, { value: "05", label: "May" }, { value: "06", label: "Jun" },
+  { value: "07", label: "Jul" }, { value: "08", label: "Aug" }, { value: "09", label: "Sep" },
+  { value: "10", label: "Oct" }, { value: "11", label: "Nov" }, { value: "12", label: "Dec" },
+];
+
+const pad2 = (n: number | string) => String(n).padStart(2, "0");
+
+/** Days in a given month/year. Falls back to a leap year (so Feb shows 29)
+ *  when the year hasn't been picked yet, then re-clamps once it is. */
+const daysInMonthOf = (monthStr: string, yearStr: string) => {
+  if (!monthStr) return 31;
+  const y = yearStr ? Number(yearStr) : 2024;
+  return new Date(y, Number(monthStr), 0).getDate();
+};
+
+interface PillOption { value: string; label: string; }
+
+/**
+ * One "Day" / "Month" / "Year" pill. Closed, it shows the placeholder in grey
+ * or the chosen value in bold once picked. Tapping it drops open a scrollable
+ * list (auto-scrolled to the current selection) — works the same with a mouse
+ * or a thumb, so no behavioural difference between desktop and mobile.
+ */
+function PillDropdown({
+  placeholder, options, selected, isOpen, onOpen, onClose, onSelect, hasError,
+}: {
+  placeholder: string;
+  options: PillOption[];
+  selected: string;
+  isOpen: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onSelect: (v: string) => void;
+  hasError?: boolean;
+}) {
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen && selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: "center" });
+    }
+  }, [isOpen]);
+
+  const selectedLabel = options.find((o) => o.value === selected)?.label;
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <button
+        type="button"
+        onClick={() => (isOpen ? onClose() : onOpen())}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className="w-full flex items-center justify-between gap-1 px-3 sm:px-4 py-3 rounded-2xl border-2 transition-all text-sm sm:text-base font-medium active:scale-[0.98]"
+        style={{
+          borderColor: isOpen ? T.green : selectedLabel ? "#bbf7d0" : hasError ? "#f87171" : "#e5e7eb",
+          background: isOpen ? "rgba(21,128,61,0.05)" : hasError && !selectedLabel ? "#fef2f2" : "#fff",
+          color: selectedLabel ? "#111827" : "#9ca3af",
+        }}
+      >
+        <span className="truncate">{selectedLabel || placeholder}</span>
+        <svg
+          width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="3"
+          className={`shrink-0 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white rounded-2xl border border-slate-100 shadow-2xl max-h-52 sm:max-h-60 overflow-y-auto py-1.5"
+        >
+          {options.length === 0 && (
+            <p className="px-4 py-3 text-xs text-gray-400">Pick month &amp; year first</p>
+          )}
+          {options.map((o) => {
+            const isSel = o.value === selected;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                ref={isSel ? selectedRef : undefined}
+                role="option"
+                aria-selected={isSel}
+                onClick={() => onSelect(o.value)}
+                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  isSel ? "text-white" : "text-gray-700 hover:bg-green-50"
+                }`}
+                style={isSel ? { background: T.green } : undefined}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const formatDobDisplay = (iso: string) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+};
+
+/**
+ * Date-of-Birth picker as three tappable pills — Day, Month, Year — each
+ * opening its own short scrollable list. Matches the compact "Day / Month"
+ * pill style, shows the picked number right on the pill, and behaves
+ * identically on phone and desktop (no native date-input quirks).
+ */
+function DateOfBirthPicker({
+  value,
+  onChange,
+  error,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  error?: string;
+}) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentYearStr = String(currentYear);
+  const currentMonthStr = pad2(today.getMonth() + 1);
+  const currentDayStr = pad2(today.getDate());
+
+  const [yearVal, setYearVal]   = useState(value ? value.split("-")[0] : "");
+  const [monthVal, setMonthVal] = useState(value ? value.split("-")[1] : "");
+  const [dayVal, setDayVal]     = useState(value ? value.split("-")[2] : "");
+  const [openField, setOpenField] = useState<"day" | "month" | "year" | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Keep local pills in sync if the value is cleared/changed from outside
+  useEffect(() => {
+    const [y, m, d] = value ? value.split("-") : ["", "", ""];
+    setYearVal(y || ""); setMonthVal(m || ""); setDayVal(d || "");
+  }, [value]);
+
+  useEffect(() => {
+    if (!openField) return;
+    const handleClick = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpenField(null);
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenField(null); };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [openField]);
+
+  // Re-clamp day/month so an impossible or future date can never be selected
+  // (e.g. switching from Jan 31 to Feb, or picking this year + a future month)
+  const clamp = (d: string, m: string, y: string) => {
+    let month = m;
+    if (y === currentYearStr && month && Number(month) > Number(currentMonthStr)) {
+      month = currentMonthStr;
+    }
+    let day = d;
+    const maxDays = daysInMonthOf(month, y);
+    if (day && Number(day) > maxDays) day = pad2(maxDays);
+    if (y === currentYearStr && month === currentMonthStr && day && Number(day) > Number(currentDayStr)) {
+      day = currentDayStr;
+    }
+    return { day, month };
+  };
+
+  const emit = (d: string, m: string, y: string) => {
+    if (d && m && y) onChange(`${y}-${m}-${d}`); else onChange("");
+  };
+
+  const yearOptions: PillOption[] = Array.from({ length: 111 }, (_, i) => {
+    const y = String(currentYear - i);
+    return { value: y, label: y };
+  });
+
+  const monthOptions: PillOption[] =
+    yearVal === currentYearStr
+      ? MONTHS_SHORT.filter((m) => Number(m.value) <= Number(currentMonthStr))
+      : MONTHS_SHORT;
+
+  const dayOptions: PillOption[] = Array.from(
+    { length: yearVal === currentYearStr && monthVal === currentMonthStr ? Number(currentDayStr) : daysInMonthOf(monthVal, yearVal) },
+    (_, i) => { const d = pad2(i + 1); return { value: d, label: d }; }
+  );
+
+  const handleSelectDay = (d: string) => {
+    setDayVal(d); setOpenField(null); emit(d, monthVal, yearVal);
+  };
+  const handleSelectMonth = (m: string) => {
+    const { day } = clamp(dayVal, m, yearVal);
+    setMonthVal(m); setDayVal(day); setOpenField(null); emit(day, m, yearVal);
+  };
+  const handleSelectYear = (y: string) => {
+    const { day, month } = clamp(dayVal, monthVal, y);
+    setYearVal(y); setMonthVal(month); setDayVal(day); setOpenField(null); emit(day, month, y);
+  };
+
+  const hasAny = !!(yearVal || monthVal || dayVal);
+
+  return (
+    <div ref={wrapperRef}>
+      <div className="flex gap-1">
+        <PillDropdown
+          placeholder="Day"
+          options={dayOptions}
+          selected={dayVal}
+          isOpen={openField === "day"}
+          onOpen={() => setOpenField("day")}
+          onClose={() => setOpenField(null)}
+          onSelect={handleSelectDay}
+          hasError={!!error && !dayVal}
+        />
+        <PillDropdown
+          placeholder="Month"
+          options={monthOptions}
+          selected={monthVal}
+          isOpen={openField === "month"}
+          onOpen={() => setOpenField("month")}
+          onClose={() => setOpenField(null)}
+          onSelect={handleSelectMonth}
+          hasError={!!error && !monthVal}
+        />
+        <PillDropdown
+          placeholder="Year"
+          options={yearOptions}
+          selected={yearVal}
+          isOpen={openField === "year"}
+          onOpen={() => setOpenField("year")}
+          onClose={() => setOpenField(null)}
+          onSelect={handleSelectYear}
+          hasError={!!error && !yearVal}
+        />
+      </div>
+
+      {hasAny && (
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-[11px] font-semibold" style={{ color: T.greenDeep }}>
+            {value ? formatDobDisplay(value) : ""}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setYearVal(""); setMonthVal(""); setDayVal(""); setOpenField(null); onChange(""); }}
+            className="text-[11px] font-bold text-gray-400 hover:text-gray-600"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const initialDonor: DonorDetails = {
   name: "", email: "", phone: "", pan_number: "", dob: "",
@@ -107,7 +380,7 @@ const initialDonor: DonorDetails = {
 export function DonateForm() {
   const router = useRouter();
   const [step, setStep]                   = useState<Step>("amount");
-  const [frequency, setFrequency]         = useState<"one-time" | "monthly">("one-time");
+  const frequency = "one-time" as const;
   const [currency, setCurrency]           = useState("usd");
   const [amount, setAmount]               = useState<number | "custom">(50);
   const [customAmount, setCustomAmount]   = useState("");
@@ -124,6 +397,7 @@ export function DonateForm() {
   const [expiresAt, setExpiresAt]         = useState<string>("");
   const [copied, setCopied]               = useState(false);
   const [secondsLeft, setSecondsLeft]     = useState<number | null>(null);
+  const [qrLoaded, setQrLoaded]           = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -144,6 +418,9 @@ export function DonateForm() {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     setDonor((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    if (errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleCurrencyChange = (code: string) => {
@@ -151,20 +428,36 @@ export function DonateForm() {
     setCurrency(code);
     setAmount(meta.presets[1]); // default to the second preset (25)
     setCustomAmount("");
+    setError("");
   };
 
+  // ── Step 1 gate: valid amount AND a chosen cause, or don't move forward ──
   const validateAmount = () => {
     const parsed = amount === "custom"
       ? parseFloat(customAmount.replace(/,/g, ""))
       : Number(amount);
+
+    let ok = true;
+
     if (!parsed || isNaN(parsed) || parsed < currencyMeta.min) {
-      setError(`Minimum donation amount is ${currencyMeta.symbol}${currencyMeta.min}.`);
-      return false;
+      setError(`Please enter at least ${currencyMeta.symbol}${currencyMeta.min} — that's the minimum for a ${currency.toUpperCase()} donation.`);
+      ok = false;
+    } else {
+      setError("");
     }
-    setError("");
-    return true;
+
+    if (!donor.donate_towards) {
+      setErrors((prev) => ({ ...prev, donate_towards: "Please select a cause before continuing" }));
+      ok = false;
+    }
+
+    return ok;
   };
 
+  // ── Step 2 gate: full details form. On failure this also writes a
+  // visible summary into `error` (rendered just above the submit button)
+  // so users don't miss why the button "did nothing" when they're
+  // scrolled past the specific field that's wrong. ──
   const validateDetails = (): boolean => {
     const e: FormErrors = {};
     if (!donor.name.trim())                                                                      e.name = "Full name is required";
@@ -185,14 +478,33 @@ export function DonateForm() {
     if (!donor.declarationAccepted)                                                              e.declarationAccepted = "You must confirm your details are correct";
     if (!donor.dpdpConsent)                                                                       e.dpdpConsent = "You must consent to data processing under DPDP Act 2023";
     setErrors(e);
-    return Object.keys(e).length === 0;
+
+    const errCount = Object.keys(e).length;
+    if (errCount > 0) {
+      const first = Object.values(e)[0] as string;
+      setError(
+        errCount === 1
+          ? first
+          : `Please fix ${errCount} fields above before continuing — first: ${first}`
+      );
+    } else {
+      setError("");
+    }
+
+    return errCount === 0;
   };
 
   // Create the Bitcoin payment
   const handlePayment = async () => {
-    if (!validateDetails()) return;
+    if (!validateDetails()) {
+      // Scroll the visible error summary into view so users notice it
+      // even if they're scrolled up near the top of a long form.
+      document.getElementById("form-error-summary")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!finalAmount || isNaN(finalAmount) || finalAmount < currencyMeta.min) {
       setError(`Please enter a valid donation amount (minimum ${currencyMeta.symbol}${currencyMeta.min}).`);
+      document.getElementById("form-error-summary")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     setLoading(true); setError("");
@@ -229,7 +541,7 @@ export function DonateForm() {
           email:      donor.email,
           phone:      donor.phone,
           donor_id:   donorData.donor.id,
-          message:    `${frequency === "monthly" ? "Monthly" : "One-time"} donation towards ${
+          message:    `One-time donation towards ${
             DONATE_TOWARDS_OPTIONS.find(o => o.value === donor.donate_towards)?.label || "General Fund"
           }`,
         }),
@@ -242,6 +554,7 @@ export function DonateForm() {
       setPayAmountBTC(btcData.payAmountBTC);
       setExpiresAt(btcData.expiresAt);
       setIsSandbox(!!btcData.sandbox);
+      setQrLoaded(false);
       setStep("payment");
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
@@ -305,58 +618,97 @@ export function DonateForm() {
 
   /* ── Payment Screen (Bitcoin) ── */
   if (step === "payment") {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=bitcoin:${payAddress}?amount=${payAmountBTC}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(`bitcoin:${payAddress}?amount=${payAmountBTC}`)}`;
+    const isExpiringSoon = secondsLeft !== null && secondsLeft < 120;
+
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-green-50">
-        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl text-center max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center px-3 sm:px-4 py-6 sm:py-8 bg-green-50">
+        <div className="bg-white rounded-3xl shadow-2xl text-center max-w-md w-full overflow-hidden">
 
-          <div className="text-3xl mb-2">₿</div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-1">Send Bitcoin to Complete Donation</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Send exactly the amount below from your wallet
-          </p>
-
-          <img src={qrUrl} alt="Bitcoin payment QR code" className="mx-auto mb-5 rounded-xl border border-gray-100" />
-
-          <div className="rounded-2xl p-4 mb-3" style={{ background: "rgba(21,128,61,0.06)", border: "1px solid rgba(21,128,61,0.15)" }}>
-            <p className="text-xs text-gray-500 mb-1">Amount to send</p>
-            <p className="text-2xl font-extrabold" style={{ color: T.green }}>
-              {payAmountBTC} BTC
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              ({currencyMeta.symbol}{finalAmount.toLocaleString()} {currency.toUpperCase()})
+          {/* Header */}
+          <div className="px-6 sm:px-8 pt-7 sm:pt-8 pb-5 sm:pb-6 text-white"
+            style={{ background: `linear-gradient(135deg, ${T.green}, ${T.greenDeep})` }}>
+            <div className="text-3xl mb-2">₿</div>
+            <h2 className="text-lg sm:text-xl font-extrabold">Send Bitcoin to Complete Donation</h2>
+            <p className="text-white/75 text-xs sm:text-sm mt-1">
+              Send exactly the amount below from your wallet
             </p>
           </div>
 
-          <div className="text-left mb-4">
-            <p className="text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Bitcoin Address</p>
-            <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-3">
-              <code className="text-xs text-gray-700 break-all flex-1">{payAddress}</code>
-              <button onClick={copyAddress}
-                className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg text-white"
-                style={{ background: T.green }}>
-                {copied ? "Copied!" : "Copy"}
-              </button>
+          <div className="p-5 sm:p-8">
+
+            {/* QR code card */}
+            <div className="mx-auto mb-5 w-full max-w-[240px] sm:max-w-[260px]">
+              <div
+                className="relative aspect-square rounded-2xl p-3 sm:p-4 bg-white"
+                style={{ border: "2px solid rgba(21,128,61,0.15)", boxShadow: "0 4px 20px rgba(21,128,61,0.10)" }}
+              >
+                {!qrLoaded && (
+                  <div className="absolute inset-3 sm:inset-4 flex items-center justify-center rounded-xl bg-slate-50">
+                    <div className="w-8 h-8 border-2 border-green-200 border-t-[#15803d] rounded-full animate-spin" />
+                  </div>
+                )}
+                <img
+                  src={qrUrl}
+                  alt="Bitcoin payment QR code"
+                  onLoad={() => setQrLoaded(true)}
+                  className="w-full h-full rounded-xl transition-opacity duration-300"
+                  style={{ opacity: qrLoaded ? 1 : 0 }}
+                />
+                {/* corner accents for a premium framed look */}
+                <div className="pointer-events-none absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 rounded-tl-md" style={{ borderColor: T.green }} />
+                <div className="pointer-events-none absolute top-1.5 right-1.5 w-4 h-4 border-t-2 border-r-2 rounded-tr-md" style={{ borderColor: T.green }} />
+                <div className="pointer-events-none absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 rounded-bl-md" style={{ borderColor: T.green }} />
+                <div className="pointer-events-none absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 rounded-br-md" style={{ borderColor: T.green }} />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2 font-medium">Scan with any Bitcoin wallet app</p>
             </div>
+
+            {/* Amount to send */}
+            <div className="rounded-2xl p-4 mb-4" style={{ background: "rgba(21,128,61,0.06)", border: "1px solid rgba(21,128,61,0.15)" }}>
+              <p className="text-xs text-gray-500 mb-1">Amount to send</p>
+              <p className="text-2xl sm:text-3xl font-extrabold" style={{ color: T.green }}>
+                {payAmountBTC} BTC
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                ({currencyMeta.symbol}{finalAmount.toLocaleString()} {currency.toUpperCase()})
+              </p>
+            </div>
+
+            {/* Bitcoin address */}
+            <div className="text-left mb-4">
+              <p className="text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Bitcoin Address</p>
+              <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-3">
+                <code className="text-xs text-gray-700 break-all flex-1">{payAddress}</code>
+                <button onClick={copyAddress}
+                  className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg text-white transition-transform active:scale-95"
+                  style={{ background: T.green }}>
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            {secondsLeft !== null && (
+              <p className="text-xs mb-4" style={{ color: isExpiringSoon ? "#dc2626" : "#9ca3af" }}>
+                ⏱ This address expires in{" "}
+                <span className="font-bold" style={{ color: isExpiringSoon ? "#dc2626" : "#4b5563" }}>
+                  {formatCountdown(secondsLeft)}
+                </span>
+              </p>
+            )}
+
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
+              <div className="w-4 h-4 border-2 border-green-300 border-t-[#15803d] rounded-full animate-spin" />
+              Waiting for payment confirmation...
+            </div>
+
+            {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+
+            <button onClick={() => setStep("details")}
+              className="text-gray-400 font-semibold hover:text-gray-700 transition text-sm py-2">
+              ← Back to details
+            </button>
           </div>
-
-          {secondsLeft !== null && (
-            <p className="text-xs text-gray-400 mb-4">
-              ⏱ This address expires in <span className="font-bold text-gray-600">{formatCountdown(secondsLeft)}</span>
-            </p>
-          )}
-
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
-            <div className="w-4 h-4 border-2 border-green-300 border-t-[#15803d] rounded-full animate-spin" />
-            Waiting for payment confirmation...
-          </div>
-
-          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-
-          <button onClick={() => setStep("details")}
-            className="text-gray-400 font-semibold hover:text-gray-700 transition text-sm py-2">
-            ← Back to details
-          </button>
         </div>
       </div>
     );
@@ -448,39 +800,28 @@ export function DonateForm() {
           {step === "amount" && (
             <div className="space-y-4 sm:space-y-5">
 
-              {/* One-time / Monthly toggle */}
-              <div className="inline-flex p-1.5 bg-slate-100 rounded-2xl w-full">
-                {(["one-time", "monthly"] as const).map((f) => (
-                  <button key={f} onClick={() => setFrequency(f)}
-                    className="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold capitalize transition-all"
-                    style={frequency === f
-                      ? { background: "#fff", color: T.green, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }
-                      : { color: "#64748b" }}>
-                    {f.replace("-", " ")}
-                  </button>
-                ))}
-              </div>
-
               {/* Currency selector */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                   Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => handleCurrencyChange(e.target.value)}
-                  className={selectCls()}
-                >
-                  {CURRENCY_OPTIONS.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
+                <SelectField>
+                  <select
+                    value={currency}
+                    onChange={(e) => handleCurrencyChange(e.target.value)}
+                    className={selectCls()}
+                  >
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </SelectField>
               </div>
 
               {/* Amount presets */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {currencyMeta.presets.map((amt) => (
-                  <button key={amt} onClick={() => setAmount(amt)}
+                  <button key={amt} onClick={() => { setAmount(amt); setError(""); }}
                     className="py-3 sm:py-4 rounded-2xl border-2 font-bold transition-all text-xs sm:text-sm"
                     style={amount === amt
                       ? { borderColor: T.green, background: "rgba(21,128,61,0.06)", color: T.green }
@@ -504,21 +845,31 @@ export function DonateForm() {
                     {currencyMeta.symbol}
                   </span>
                   <input type="number" value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCustomAmount(v);
+                      const parsed = parseFloat(v.replace(/,/g, ""));
+                      if (v && (!parsed || isNaN(parsed) || parsed < currencyMeta.min)) {
+                        setError(`Please enter at least ${currencyMeta.symbol}${currencyMeta.min} — that's the minimum for a ${currency.toUpperCase()} donation.`);
+                      } else {
+                        setError("");
+                      }
+                    }}
                     placeholder={`Minimum ${currencyMeta.symbol}${currencyMeta.min}`}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-10 pr-5 py-4 outline-none font-bold text-lg text-gray-900 transition-all"
-                    style={{ borderColor: "transparent" }}
-                    onFocus={e => (e.currentTarget.style.borderColor = T.green)}
-                    onBlur={e  => (e.currentTarget.style.borderColor = "transparent")} />
+                    className={`w-full border-2 rounded-2xl pl-10 pr-5 py-4 outline-none font-bold text-lg text-gray-900 transition-all ${
+                      error ? "bg-red-50 border-red-300" : "bg-slate-50 border-slate-100 focus:border-[#15803d]"
+                    }`} />
                 </div>
               )}
+
+              {error && <p className="text-red-500 text-sm text-center -mt-1">{error}</p>}
 
               {/* Donate Towards */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                   Donate Towards *
                 </label>
-                <div className="relative">
+                <SelectField>
                   <select name="donate_towards" value={donor.donate_towards}
                     onChange={handleChange}
                     className={selectCls(errors.donate_towards)}>
@@ -526,7 +877,7 @@ export function DonateForm() {
                       <option key={o.value} value={o.value} disabled={o.value === ""}>{o.label}</option>
                     ))}
                   </select>
-                </div>
+                </SelectField>
                 <ErrorMsg msg={errors.donate_towards} />
               </div>
 
@@ -537,8 +888,6 @@ export function DonateForm() {
                   {getImpactMessage(donor.donate_towards, finalAmount)}
                 </div>
               )}
-
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <button
                 onClick={() => { if (validateAmount()) setStep("details"); }}
@@ -579,28 +928,36 @@ export function DonateForm() {
                 <ErrorMsg msg={errors.phone} />
               </div>
 
-              {/* DOB */}
+              {/* DOB — custom responsive calendar picker (dropdown on desktop, bottom sheet on mobile) */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Date of Birth *</label>
-                <input name="dob" type="date" value={donor.dob} onChange={handleChange}
-                  className={inputCls(errors.dob)} />
+                <DateOfBirthPicker
+                  value={donor.dob}
+                  error={errors.dob}
+                  onChange={(iso) => {
+                    setDonor((prev) => ({ ...prev, dob: iso }));
+                    if (errors.dob) setErrors((prev) => ({ ...prev, dob: undefined }));
+                  }}
+                />
                 <ErrorMsg msg={errors.dob} />
               </div>
 
               {/* Donor Category */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Donor Category *</label>
-                <select name="donor_category" value={donor.donor_category}
-                  onChange={(e) => setDonor({
-                    ...donor,
-                    donor_category: e.target.value as DonorDetails["donor_category"],
-                    state: "", country: "", pincode: "", pan_number: "", passport_number: "",
-                  })}
-                  className={selectCls()}>
-                  <option value="indian">Indian (Resident)</option>
-                  <option value="nri">NRI (Non-Resident Indian)</option>
-                  <option value="foreign">Foreign National</option>
-                </select>
+                <SelectField>
+                  <select name="donor_category" value={donor.donor_category}
+                    onChange={(e) => setDonor({
+                      ...donor,
+                      donor_category: e.target.value as DonorDetails["donor_category"],
+                      state: "", country: "", pincode: "", pan_number: "", passport_number: "",
+                    })}
+                    className={selectCls()}>
+                    <option value="indian">Indian (Resident)</option>
+                    <option value="nri">NRI (Non-Resident Indian)</option>
+                    <option value="foreign">Foreign National</option>
+                  </select>
+                </SelectField>
               </div>
 
               {/* PAN — Indian & NRI */}
@@ -653,19 +1010,23 @@ export function DonateForm() {
                   {isIndian ? (
                     <>
                       <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">State *</label>
-                      <select name="state" value={donor.state} onChange={handleChange} className={selectCls(errors.state)}>
-                        <option value="" disabled>Select state</option>
-                        {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      <SelectField>
+                        <select name="state" value={donor.state} onChange={handleChange} className={selectCls(errors.state)}>
+                          <option value="" disabled>Select state</option>
+                          {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </SelectField>
                       <ErrorMsg msg={errors.state} />
                     </>
                   ) : (
                     <>
                       <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Country *</label>
-                      <select name="country" value={donor.country} onChange={handleChange} className={selectCls(errors.country)}>
-                        <option value="" disabled>Select country</option>
-                        {WORLD_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <SelectField>
+                        <select name="country" value={donor.country} onChange={handleChange} className={selectCls(errors.country)}>
+                          <option value="" disabled>Select country</option>
+                          {WORLD_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </SelectField>
                       <ErrorMsg msg={errors.country} />
                     </>
                   )}
@@ -692,7 +1053,7 @@ export function DonateForm() {
               )}
 
               {/* Amount summary */}
-              <div className="rounded-xl p-3 sm:p-4 flex justify-between items-center"
+              <div className="rounded-xl p-3 sm:p-4 flex flex-wrap justify-between items-center gap-2"
                 style={{ background: "rgba(21,128,61,0.05)", border: "1px solid rgba(21,128,61,0.12)" }}>
                 <div>
                   <p className="text-xs text-gray-500">Donating</p>
@@ -705,10 +1066,6 @@ export function DonateForm() {
                   <p className="font-bold text-gray-700 text-xs">
                     {DONATE_TOWARDS_OPTIONS.find(o => o.value === donor.donate_towards)?.label || "—"}
                   </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Type</p>
-                  <p className="font-bold text-gray-700 capitalize text-sm">{frequency}</p>
                 </div>
                 <button onClick={() => setStep("amount")}
                   className="text-xs font-bold hover:underline" style={{ color: T.green }}>
@@ -754,7 +1111,14 @@ export function DonateForm() {
                 <ErrorMsg msg={errors.dpdpConsent} />
               </div>
 
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {/* Visible error summary — sits right above the submit button so
+                  it's always noticed regardless of scroll position, in addition
+                  to the inline per-field errors above. */}
+              {error && (
+                <p id="form-error-summary" className="text-red-500 text-sm text-center font-semibold bg-red-50 border border-red-200 rounded-xl py-2 px-3">
+                  {error}
+                </p>
+              )}
 
               {/* Submit */}
               <div className="pt-2 border-t border-slate-100">
