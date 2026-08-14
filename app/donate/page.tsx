@@ -63,7 +63,7 @@ export default function DonatePage() {
       </section>
 
       {/* ── Donate Form Section ── */}
-      <section className="py-12 md:py-16 bg-white border-b border-emerald-100 relative">
+      <section id="donate-form" className="py-12 md:py-16 bg-white border-b border-emerald-100 relative scroll-mt-24">
         <div className="max-w-lg mx-auto px-4 sm:px-6">
           <DonateForm />
         </div>
@@ -89,22 +89,22 @@ export default function DonatePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
             <SevaCard emoji="🍱" title="Annadhanam Fund"
               description="Sponsor free meals for devotees and the poor. Vallalar taught that feeding the hungry is the highest form of worship."
-              link="/donate?fund=annadhanam" tag="Most Popular" />
+              link="/donate?fund=annadhanam#donate-form" tag="Most Popular" />
             <SevaCard emoji="🏛️" title="Temple Construction"
               description="Contribute to the building and renovation of the temple complex — a permanent legacy of your faith."
-              link="/donate?fund=construction" />
+              link="/donate?fund=construction#donate-form" />
             <SevaCard emoji="📚" title="Education Aid"
               description="Fund school fees, books, and supplies for underprivileged children in the temple community."
-              link="/donate?fund=education" />
+              link="/donate?fund=education#donate-form" />
             <SevaCard emoji="🪔" title="Festival Sponsorship"
               description="Be the sponsor of a sacred festival celebration — from decorations to prasad distribution."
-              link="/donate?fund=festival" />
+              link="/donate?fund=festival#donate-form" />
             <SevaCard emoji="🏥" title="Medical Camp"
               description="Support free medical check-up camps for the elderly and the poor organised by the trust."
-              link="/donate?fund=medical" />
+              link="/donate?fund=medical#donate-form" />
             <SevaCard emoji="🙏" title="General Seva Fund"
               description="Your contribution goes where it is needed most — supporting all ongoing seva activities of the trust."
-              link="/donate?fund=general" />
+              link="/donate?fund=general#donate-form" />
           </div>
         </div>
       </section>
@@ -168,7 +168,7 @@ export default function DonatePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <a href="/donate?frequency=monthly"
+            <a href="/donate?frequency=monthly#donate-form"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-200">
               <HandHeart className="w-4 h-4" />
               Start Monthly Seva

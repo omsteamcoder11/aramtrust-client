@@ -1,5 +1,4 @@
 "use client";
-import SupportModal from "./SupportModal"
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Heart, ChevronDown, Menu, X } from 'lucide-react';
 import Link from 'next/link';
@@ -62,7 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     key: 'donate', topText: 'MAKE A', bottomText: 'DIFFERENCE', align: 'right',
     links: [
-      { label: 'DONATE NOW',             href: '/donate' },
+      { label: 'DONATE NOW',             href: '/donate#donate-form' },
       // { label: 'SPONSOR A SEVA',         href: '/sponsor-form' },
 // { label: 'FUND TEMPLE CONSTRUCTION', href: '/services/construction' },
       { label: 'VOLUNTEER WITH US',      href: '/volunteer' },
@@ -308,9 +307,6 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled]             = useState(false);
   const [scrollProgress, setScrollProgress]     = useState(0);
-const [showSupportModal, setShowSupportModal] = useState(false);
-const handleOpenSupport = () => setShowSupportModal(true);
-const handleCloseSupport = () => setShowSupportModal(false);
   const headerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -343,14 +339,8 @@ const handleCloseSupport = () => setShowSupportModal(false);
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
-const openMenu   = useCallback((k: string) => setActiveMenu(k), []);
-const closeMenu  = useCallback(() => setActiveMenu(null), []);
-
-useEffect(() => {
-  const fn = () => setShowSupportModal(true);
-  window.addEventListener('openSupportModal', fn);
-  return () => window.removeEventListener('openSupportModal', fn);
-}, []);
+  const openMenu   = useCallback((k: string) => setActiveMenu(k), []);
+  const closeMenu  = useCallback(() => setActiveMenu(null), []);
   const toggleMenu = useCallback((k: string) => setActiveMenu(p => p === k ? null : k), []);
   const closeMobile = useCallback(() => setIsMobileMenuOpen(false), []);
 
@@ -448,7 +438,7 @@ useEffect(() => {
               <Search size={19} strokeWidth={2.5} aria-hidden="true" />
             </button>
 
-            <Link href="/donate"
+            <Link href="/donate#donate-form"
               className="flex items-center gap-1.5 active:scale-95 hover:-translate-y-0.5"
               style={{
                 padding: '10px 20px', borderRadius: 10, fontWeight: 800,
@@ -464,29 +454,6 @@ useEffect(() => {
               <Heart size={13} style={{ fill: '#ffffff' }} aria-hidden="true" />
               Give
             </Link>
-
-            <button
-  onClick={handleOpenSupport}
-  className="hidden md:inline-flex items-center active:scale-95 hover:-translate-y-0.5"
-  style={{
-    padding: '10px 18px', borderRadius: 10, fontWeight: 800,
-    fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.07em',
-    color: T.saffron, cursor: 'pointer',
-    border: `1.5px solid rgba(22,163,74,0.35)`,
-    background: 'transparent',
-    transition: 'transform 250ms, background 200ms, border-color 200ms',
-  }}
-  onMouseEnter={e => {
-    (e.currentTarget as HTMLElement).style.background = 'rgba(22,163,74,0.06)';
-    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(22,163,74,0.60)';
-  }}
-  onMouseLeave={e => {
-    (e.currentTarget as HTMLElement).style.background = 'transparent';
-    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(22,163,74,0.35)';
-  }}
->
-  Support Us
-</button>
 
             <button onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open navigation menu"
@@ -579,7 +546,7 @@ useEffect(() => {
             padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12,
             flexShrink: 0, borderTop: `1px solid rgba(22,163,74,0.10)`,
           }}>
-            <Link href="/donate" onClick={closeMobile}
+            <Link href="/donate#donate-form" onClick={closeMobile}
               className="active:scale-95 hover:-translate-y-0.5"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -593,23 +560,10 @@ useEffect(() => {
               <Heart size={15} style={{ fill: '#ffffff' }} aria-hidden="true" />
               Give Now
             </Link>
-           <button onClick={() => { handleOpenSupport(); closeMobile(); }}
-  className="active:scale-95 hover:-translate-y-0.5"
-  style={{
-    display: 'block', textAlign: 'center', width: '100%',
-    padding: '13px', borderRadius: 14, fontWeight: 800,
-    fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em',
-    color: T.saffron, cursor: 'pointer',
-    border: `1.5px solid rgba(22,163,74,0.30)`,
-    background: 'rgba(22,163,74,0.05)',
-    transition: 'transform 250ms',
-  }}>
-  Support Us
-</button>
           </div>
         </div>
       </div>
-<SupportModal key={showSupportModal ? 'open' : 'closed'} isOpen={showSupportModal} onClose={handleCloseSupport} />    </>
+    </>
   );
 };
 
