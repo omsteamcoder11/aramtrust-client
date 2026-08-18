@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 
 /* ── Leaf SVG (replacing Diya for Aram Trust) ── */
 const LeafIcon = ({ size = 32 }) => (
@@ -138,16 +138,6 @@ export default function Footer() {
                   {text}
                 </a>
               ))}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#4b5563' }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8, flexShrink: 0, marginTop: 2,
-                  background: 'rgba(5,150,105,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <MapPin size={13} style={{ color: T.emerald }} />
-                </div>
-                <span>Aram Trust,<br />Periyakurichi, Neyveli - 2,<br />Tamil Nadu, India</span>
-              </div>
             </div>
 
           </div>
